@@ -1,0 +1,16 @@
+INCIDENT DISPOSITION CODE,Description
+,
+82,transporting patient
+83,patient pronounced dead
+87,cancelled
+90,unfounded
+91,condition corrected
+92,treated not transported
+93,refused medical aid
+94,treated and transported
+95,triaged at scene no transport
+96,patient gone on arrival
+CANCEL,cancelled
+DUP,duplicate incident
+NOTSNT,unit not sent
+ZZZZZZ,no disposition

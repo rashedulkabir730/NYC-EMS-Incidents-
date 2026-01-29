@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# Data & databases
+data/
+testing_db
+*.db
+*.duckdb
+
+# OS
+.DS_Store

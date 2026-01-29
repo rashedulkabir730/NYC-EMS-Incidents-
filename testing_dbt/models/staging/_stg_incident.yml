@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: stg_incident
+    columns:
+      - name: cad_incident_id
+        tests:
+          - unique
+          - not_null
+
+      - name: borough
+        tests:
+          - accepted_values:
+              values:
+                - BROOKLYN
+                - BRONX
+                - MANHATTAN
+                - QUEENS
+                - RICHMOND / STATEN ISLAND
