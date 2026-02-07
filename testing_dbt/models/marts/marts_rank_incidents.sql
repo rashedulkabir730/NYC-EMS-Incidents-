@@ -1,13 +1,13 @@
-WITH borough_counts AS (
-    SELECT
-        borough,
-        COUNT(*) AS total_incidents
-    FROM {{ ref('int_enrichment') }}
-    GROUP BY borough
+with borough_counts as (
+  select
+    borough,
+    COUNT(*) as total_incidents
+  from {{ ref('int_enrichment') }}
+  group by borough
 )
 
-SELECT
-    borough,
-    total_incidents,
-    RANK() OVER (ORDER BY total_incidents DESC) AS rank
-FROM borough_counts
+select
+  borough,
+  total_incidents,
+  RANK() over (order by total_incidents desc) as rank
+from borough_counts

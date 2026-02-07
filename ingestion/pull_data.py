@@ -9,9 +9,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()  
 
+LOG_FOLDER = "ingest_logs"
+LOG_FILENAME = "datapipeline.log"
+LOG_FILEPATH = os.path.join(LOG_FOLDER, LOG_FILENAME)
+
 logging.basicConfig(
     level=logging.DEBUG,  
-    filename='datapipeline.log',
+    filename=LOG_FILEPATH,
     filemode="w",
     format='%(asctime)s - %(levelname)s - %(message)s')
 

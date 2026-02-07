@@ -1,5 +1,5 @@
-from pull_data import pull_data
-from data_sql import load_data_duckdb
+from ingestion.pull_data import pull_data
+from ingestion.data_sql import load_data_duckdb
 import logging 
 
 def main():
