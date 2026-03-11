@@ -1,0 +1,127 @@
+version: 2
+
+models:
+  - name: marts_avg_response_time
+    description: >
+      Average EMS dispatch and on-scene response times aggregated by borough.
+      Only includes records where the respective response time validity flags are set,
+      ensuring outliers and data entry errors are excluded.
+
+    columns:
+      - name: borough
+        description: NYC borough where the EMS incident occurred (BROOKLYN, BRONX, MANHATTAN, QUEENS, RICHMOND / STATEN ISLAND).
+
+      - name: avg_dispatch_response_seconds
+        description: >
+          Average seconds from incident report to first unit being dispatched, by borough.
+          Computed only over records where valid_dispatch_rspns_time_indc is set.
+
+      - name: avg_incident_response_seconds
+        description: >
+          Average seconds from incident report to first unit arriving on scene, by borough.
+          Computed only over records where valid_incident_rspns_time_indc is set.
+
+  - name: marts_incident_dow
+    description: >
+      Total EMS incident counts broken down by day of week and borough.
+      Useful for identifying weekly demand patterns and peak operational days per borough.
+
+    columns:
+      - name: borough
+        description: NYC borough where the EMS incident occurred.
+
+      - name: day_of_week_of_incident
+        description: Day of the week as an integer (0 = Sunday, 6 = Saturday).
+
+      - name: total_incidents
+        description: Total number of EMS incidents for that borough and day of week combination.
+
+  - name: marts_incident_growth_MoM
+    description: >
+      Month-over-month EMS incident volume trends. Includes raw count, prior month count,
+      absolute change, and percentage change. Useful for identifying seasonal surges or declines.
+
+    columns:
+      - name: month_of_incident
+        description: Month of the incident as an integer (1 = January, 12 = December).
+
+      - name: total_incidents
+        description: Total number of EMS incidents in that month.
+
+      - name: mom_change
+        description: Absolute change in incident count compared to the prior month (current - prior).
+
+      - name: mom_pct_change
+        description: Percentage change in incident count compared to the prior month, rounded to two decimal places.
+
+  - name: marts_rank_incidents
+    description: >
+      Total EMS incident counts per borough, ranked from highest to lowest volume.
+      Provides a quick view of which boroughs generate the most EMS demand.
+
+    columns:
+      - name: borough
+        description: NYC borough where the EMS incident occurred.
+
+      - name: total_incidents
+        description: Total number of EMS incidents in the borough.
+
+      - name: rank
+        description: Borough rank by total incident count (1 = highest volume).
+
+  - name: marts_response_cat_borough
+    description: >
+      Incident counts segmented by response speed category and borough.
+      Response categories are derived from incident_response_seconds_qy:
+      Fast (under 5 min), Moderate (5–10 min), Slow (10+ min).
+
+    columns:
+      - name: borough
+        description: NYC borough where the EMS incident occurred.
+
+      - name: response_category
+        description: Speed bucket for EMS response — Fast, Moderate, or Slow.
+
+      - name: total_incidents
+        description: Total number of incidents in that borough and response category.
+
+  - name: marts_special_events
+    description: >
+      EMS incident counts during special events (special_event_indicator = 'Y'),
+      aggregated by borough. Used to assess EMS demand during planned events such as the NYC Marathon.
+
+    columns:
+      - name: borough
+        description: NYC borough where the special-event EMS incident occurred.
+
+      - name: total_incidents
+        description: Total number of EMS incidents flagged as occurring during a special event.
+
+  - name: marts_total_incidents_by_final_call_type
+    description: >
+      Total EMS incident counts grouped by final call type description — the incident classification
+      assigned after the call was resolved. Reflects actual medical nature of incidents.
+
+    columns:
+      - name: final_call_type_desc
+        description: >
+          Human-readable description of the final incident type (e.g., "CARDIAC ARREST", "STROKE").
+          Resolved from the final_call_type code via the Call Type Descriptions seed table.
+
+      - name: total_incidents
+        description: Total number of incidents with that final call type.
+
+  - name: marts_total_incidents_by_initial_call_type_desc
+    description: >
+      Total EMS incident counts grouped by initial call type description — the classification
+      assigned when the call was first received. May differ from the final call type
+      as incidents are reclassified after resolution.
+
+    columns:
+      - name: inital_call_type_desc
+        description: >
+          Human-readable description of the initial incident type as reported by the caller
+          (e.g., "CHEST PAIN", "DIFFICULTY BREATHING"). Resolved via the Call Type Descriptions seed table.
+
+      - name: total_incidents
+        description: Total number of incidents with that initial call type.

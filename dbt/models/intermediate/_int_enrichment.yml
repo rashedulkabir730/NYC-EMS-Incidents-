@@ -1,0 +1,144 @@
+version: 2
+
+models:
+  - name: int_enrichment
+    description: >
+      Enriched EMS incident records built on top of stg_incident. Adds derived temporal
+      features (day of week, month, year, hour) and a response speed category. Incident
+      disposition codes and call type codes are resolved to human-readable descriptions
+      via LEFT JOINs with seed reference tables.
+
+    columns:
+      # --- Identifiers ---
+      - name: cad_incident_id
+        description: Unique identifier for the EMS incident, assigned by the Computer-Aided Dispatch system.
+
+      # --- Timestamps ---
+      - name: incident_datetime
+        description: Date and time the incident was reported.
+
+      - name: first_assignment_datetime
+        description: Date and time the first unit was assigned to the incident.
+
+      - name: first_activation_datetime
+        description: Date and time the first unit was activated (en route).
+
+      - name: first_on_scene_datetime
+        description: Date and time the first unit arrived on scene.
+
+      - name: first_to_hosp_datetime
+        description: Date and time the unit departed for the hospital.
+
+      - name: first_to_hosp_arrival_datetime
+        description: Date and time the unit arrived at the hospital.
+
+      - name: incident_close_datetime
+        description: Date and time the incident was closed.
+
+      # --- Response Time Metrics ---
+      - name: dispatch_response_seconds_qy
+        description: Seconds from incident report to first unit being dispatched.
+
+      - name: incident_response_seconds_qy
+        description: Seconds from incident report to first unit arriving on scene.
+
+      - name: incident_travel_tm_seconds_qy
+        description: Seconds from first unit activation to arriving on scene (travel time only).
+
+      - name: valid_dispatch_rspns_time_indc
+        description: Flag indicating whether the dispatch response time is valid for analysis.
+
+      - name: valid_incident_rspns_time_indc
+        description: Flag indicating whether the incident response time is valid for analysis.
+
+      # --- Incident Indicators ---
+      - name: held_indicator
+        description: Indicates whether the incident was held (unit assigned but not yet activated).
+
+      - name: reopen_indicator
+        description: Indicates whether the incident was reopened after initial closure.
+
+      - name: special_event_indicator
+        description: Indicates whether the incident occurred during a planned special event (e.g., NYC Marathon).
+
+      - name: standby_indicator
+        description: Indicates whether the unit was placed on standby for the incident.
+
+      - name: transfer_indicator
+        description: Indicates whether the patient was transferred to another unit or facility.
+
+      # --- Call Classification ---
+      - name: initial_call_type
+        description: Code for the incident type as classified when the call was first received.
+
+      - name: final_call_type
+        description: Code for the incident type as reclassified after the incident was closed.
+
+      - name: initial_severity_level_code
+        description: Severity level assigned to the incident at the time of the initial call.
+
+      - name: final_severity_level_code
+        description: Severity level assigned after incident resolution.
+
+      - name: incident_disposition_code
+        description: Raw code representing the final outcome or disposition of the incident.
+
+      # --- Location ---
+      - name: borough
+        description: NYC borough where the incident occurred (BROOKLYN, BRONX, MANHATTAN, QUEENS, RICHMOND / STATEN ISLAND).
+
+      - name: incident_dispatch_area
+        description: EMS dispatch area within the borough.
+
+      - name: zipcode
+        description: ZIP code of the incident location.
+
+      - name: policeprecinct
+        description: NYPD precinct number for the incident location.
+
+      - name: citycouncildistrict
+        description: NYC City Council district number for the incident location.
+
+      - name: communitydistrict
+        description: NYC Community Board district number.
+
+      - name: communityschooldistrict
+        description: NYC community school district number for the incident location.
+
+      - name: congressionaldistrict
+        description: US Congressional district number for the incident location.
+
+      # --- Derived Temporal Features ---
+      - name: day_of_week_of_incident
+        description: Day of the week the incident occurred, as an integer (0 = Sunday, 6 = Saturday).
+
+      - name: month_of_incident
+        description: Month the incident occurred, as an integer (1 = January, 12 = December).
+
+      - name: year_of_incident
+        description: Year the incident occurred.
+
+      - name: hour_of_incident
+        description: Hour of the day the incident was reported (0–23, 24-hour clock).
+
+      - name: response_category
+        description: >
+          Bucketed speed of EMS response based on incident_response_seconds_qy.
+          Fast = under 300 seconds (5 min), Moderate = 300–599 seconds (5–10 min),
+          Slow = 600 seconds or more (10+ min).
+
+      # --- Enriched Descriptions (from seeds) ---
+      - name: Description
+        description: >
+          Human-readable outcome of the incident, resolved from incident_disposition_code
+          via the Incident Dispositions seed table (e.g., "transporting patient", "patient pronounced dead").
+
+      - name: inital_call_type_desc
+        description: >
+          Full description of the initial call type, resolved from initial_call_type
+          via the Call Type Descriptions seed table (e.g., "CARDIAC ARREST", "ASTHMA ATTACK - MAJOR").
+
+      - name: final_call_type_desc
+        description: >
+          Full description of the final call type, resolved from final_call_type
+          via the Call Type Descriptions seed table. Reflects the reclassified incident type after resolution.
