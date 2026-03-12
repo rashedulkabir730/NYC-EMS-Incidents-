@@ -103,3 +103,89 @@ Two CSV seed files in `dbt/seeds/` map codes to human-readable descriptions:
 - **Incident Dispositions** — maps disposition codes (e.g. `82`, `83`) to outcomes
 
 These are joined in `int_enrichment` to enrich incidents with readable labels.
+
+---
+
+## Streamlit Dashboard
+
+**Entry point:** `streamlit_app.py`
+**Theme:** `.streamlit/config.toml` — red primary, dark navy sidebar, Inter font
+
+The dashboard queries `test.int_enrichment` directly (bypassing pre-aggregated mart tables) so that date and borough filters apply to every chart without re-running dbt.
+
+### Sidebar filters
+
+- **Date range** — `st.date_input` with min/max derived from actual data bounds; **Reset dates** button snaps back to full range
+- **Borough** — multiselect; defaults to all 5 boroughs
+
+### Charts
+
+| Chart | Source query |
+|---|---|
+| KPI cards (total incidents, avg response, avg dispatch, special events) | Direct aggregates from `int_enrichment` |
+| Incidents by borough (bar) | `COUNT(*) GROUP BY borough` |
+| Avg response time by borough — Dispatch vs On-scene (grouped bar) | `AVG(dispatch/incident_response_seconds_qy)` |
+| Response speed breakdown — Fast/Moderate/Slow (100% stacked bar) | `COUNT(*) GROUP BY borough, response_category` |
+| Month-over-month incident volume (bar, directional color) | `COUNT(*) GROUP BY EXTRACT(YEAR/MONTH)` + LAG |
+| Incidents by day of week (heatmap) | `COUNT(*) GROUP BY borough, day_of_week_of_incident` |
+| Special event incidents by borough (bar) | `WHERE special_event_indicator = 'Y'` |
+| Top 15 initial call types — chart + table toggle | `COUNT(*) GROUP BY initial_call_type_desc` |
+| Top 15 final call types — chart + table toggle | `COUNT(*) GROUP BY final_call_type_desc` |
+
+### Color system
+
+- Each borough has a **fixed color** across all charts (Bronx=red, Brooklyn=blue, Manhattan=green, Queens=purple, Staten Island=orange)
+- Response speed: semantic green / orange / red
+- MoM direction: red = volume grew, green = volume declined
+- Single-series bars: accent blue
+- All colors defined as constants at the top of `streamlit_app.py`
+
+### Caching
+
+All query functions use `@st.cache_data(ttl=3600)` keyed on `(start_date, end_date, boroughs_tuple)` — repeated filter selections are served instantly from cache.
+
+### Chatbot tab (EMS Assistant)
+
+Fully wired to `rag.py`. On each user message:
+1. `retrieve_context(question)` queries ChromaDB for the top-3 relevant dbt schema docs
+2. `ask_ems(question, history)` calls Claude with a system prompt + schema context + a `run_query` tool
+3. Claude executes SQL via the tool, then returns a natural-language answer
+4. The answer is displayed with `st.markdown`; session history is maintained in `st.session_state.messages`
+
+The history passed to `ask_ems` is all messages before the current question. Tool-use content blocks are serialised with `.model_dump()` before being appended to the messages array (fixes Pydantic v2 `by_alias` serialisation bug).
+
+### dbt schema note
+
+dbt materializes all models into the `test` schema (configured in `~/.dbt/profiles.yml`). All dashboard queries therefore use `test.<table_name>` explicitly.
+
+---
+
+## RAG Module (`rag.py`)
+
+**Entry point:** `rag.py`
+**Dependencies:** `chromadb`, `anthropic`, `pyyaml`, `duckdb`, `python-dotenv`
+
+### Initialisation (runs once at import time)
+
+- Walks all YAML files under `dbt/models/` and builds one text document per dbt model (name + description + all column descriptions)
+- Loads documents into an in-memory ChromaDB collection (`ems_metadata`)
+- Initialises `anthropic.Anthropic()` client (reads `ANTHROPIC_API_KEY` from `.env`)
+
+### Public API
+
+- `retrieve_context(question: str) -> str` — queries ChromaDB for top-3 relevant schema docs, returns them joined as a string
+- `ask_ems(question: str, history: list[dict]) -> str` — full pipeline:
+  1. Retrieve schema context
+  2. Call Claude (`claude-sonnet-4-6`) with system prompt + context + `run_query` tool
+  3. If Claude calls the tool, execute the SQL against `data/raw.duckdb` (read-only) and feed results back
+  4. Loop until Claude returns a final text answer
+
+### Tool definition
+
+The `run_query` tool takes a single `sql` string and runs it against `test.int_enrichment`. Results are returned as a plain-text table (max 50 rows). Query errors are caught and returned as strings so Claude can self-correct.
+
+### Known quirks
+
+- ChromaDB client is in-memory — documents reload every time the Python process starts (fast enough, ~8 documents)
+- Pydantic v2 `by_alias` bug: tool-use `response.content` blocks must be serialised with `.model_dump()` before appending to the messages list
+- `ANTHROPIC_API_KEY` must be set in `.env`; the module raises at import time if the key is missing

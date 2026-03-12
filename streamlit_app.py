@@ -12,6 +12,14 @@ import pandas as pd
 import altair as alt
 import streamlit as st
 
+# RAG module — initialises ChromaDB once at import time
+try:
+    from rag import ask_ems
+    RAG_READY = True
+except Exception as _rag_err:
+    RAG_READY = False
+    _RAG_ERROR = str(_rag_err)
+
 # =============================================================================
 # Page config — must be first Streamlit call
 # =============================================================================
@@ -324,14 +332,14 @@ with tab_dashboard:
         with kpi2:
             avg_resp_min = round(kpis["avg_resp"] / 60, 1) if kpis["avg_resp"] else "—"
             with st.container(border=True):
-                st.metric("Avg response time", f"{avg_resp_min} min")
+                st.metric("Avg Response Time", f"{avg_resp_min} min")
         with kpi3:
             avg_disp_sec = int(kpis["avg_disp"]) if kpis["avg_disp"] else "—"
             with st.container(border=True):
-                st.metric("Avg dispatch time", f"{avg_disp_sec} sec")
+                st.metric("Avg Dispatch Time", f"{avg_disp_sec} sec")
         with kpi4:
             with st.container(border=True):
-                st.metric("Special event incidents", f"{kpis['special']:,}")
+                st.metric("Special Event Incidents", f"{kpis['special']:,}")
 
         st.write("")
 
@@ -340,11 +348,11 @@ with tab_dashboard:
 
         with col1:
             with st.container(border=True):
-                st.markdown("**:material/bar_chart: Incidents by borough**")
+                st.markdown("**:material/bar_chart: Incidents by Borough**")
                 df_rank = load_borough_rank(start_date, end_date, boroughs_tuple)
                 st.altair_chart(
                     alt.Chart(df_rank).mark_bar().encode(
-                        x=alt.X("total_incidents:Q", title="Total incidents"),
+                        x=alt.X("total_incidents:Q", title="Total Incidents"),
                         y=alt.Y("borough:N", sort="-x", title=None),
                         color=alt.Color("borough:N", legend=None,
                             scale=alt.Scale(domain=BOROUGH_DOMAIN, range=BOROUGH_RANGE)),
@@ -359,7 +367,7 @@ with tab_dashboard:
 
         with col2:
             with st.container(border=True):
-                st.markdown("**:material/timer: Avg response time by borough (seconds)**")
+                st.markdown("**:material/timer: Avg Response Time by Borough (seconds)**")
                 df_resp = load_avg_response(start_date, end_date, boroughs_tuple)
                 melted = df_resp.melt(
                     id_vars="borough",
@@ -394,7 +402,7 @@ with tab_dashboard:
 
         with col3:
             with st.container(border=True):
-                st.markdown("**:material/speed: Response speed by borough**")
+                st.markdown("**:material/speed: Response Speed by Borough**")
                 df_cat = load_response_cat(start_date, end_date, boroughs_tuple)
                 st.altair_chart(
                     alt.Chart(df_cat).mark_bar().encode(
@@ -414,7 +422,7 @@ with tab_dashboard:
 
         with col4:
             with st.container(border=True):
-                st.markdown("**:material/trending_up: Month-over-month incident volume**")
+                st.markdown("**:material/trending_up: Month-over-Month Incident Volume**")
                 df_mom = load_mom(start_date, end_date, boroughs_tuple)
                 df_mom["month_label"] = df_mom["month_of_incident"].astype(int).map(MONTH_LABELS)
                 df_mom["mom_pct_display"] = (df_mom["mom_pct_change"] * 100).round(1)
@@ -444,7 +452,7 @@ with tab_dashboard:
 
         with col5:
             with st.container(border=True):
-                st.markdown("**:material/calendar_today: Incidents by day of week**")
+                st.markdown("**:material/calendar_today: Incidents by Day Of Week**")
                 df_dow = load_dow(start_date, end_date, boroughs_tuple)
                 df_dow["day_label"] = df_dow["day_of_week_of_incident"].map(DOW_LABELS)
                 st.altair_chart(
@@ -464,7 +472,7 @@ with tab_dashboard:
 
         with col6:
             with st.container(border=True):
-                st.markdown("**:material/local_hospital: Special event incidents by borough**")
+                st.markdown("**:material/local_hospital: Special Event Incidents by Borough**")
                 df_special = load_special_events(start_date, end_date, boroughs_tuple)
                 st.altair_chart(
                     alt.Chart(df_special).mark_bar().encode(
@@ -489,7 +497,7 @@ with tab_dashboard:
 
         with col7:
             with st.container(border=True):
-                st.markdown("**:material/call: Top initial call types**")
+                st.markdown("**:material/call: Top Initial Call Types**")
                 df_init = load_initial_call_types(start_date, end_date, boroughs_tuple)
                 tab_chart, tab_table = st.tabs([":material/bar_chart: Chart", ":material/table: Table"])
                 with tab_chart:
@@ -513,7 +521,7 @@ with tab_dashboard:
 
         with col8:
             with st.container(border=True):
-                st.markdown("**:material/assignment_turned_in: Top final call types**")
+                st.markdown("**:material/assignment_turned_in: Top Final Call Types**")
                 df_final = load_final_call_types(start_date, end_date, boroughs_tuple)
                 tab_chart2, tab_table2 = st.tabs([":material/bar_chart: Chart", ":material/table: Table"])
                 with tab_chart2:
@@ -548,20 +556,20 @@ with tab_chatbot:
     st.caption("Ask questions about NYC EMS incident data in plain English.")
     st.write("")
 
-    with st.container(border=True):
-        st.markdown("🚧 **Coming soon** — the EMS Assistant chatbot is under construction. The interface below is a preview.")
-
-    st.write("")
+    if not RAG_READY:
+        st.error(f"Could not initialise EMS Assistant: {_RAG_ERROR}", icon=":material/error:")
+        st.stop()
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Suggestion chips — shown only when chat is empty
     if not st.session_state.messages:
         suggestions = [
             "Which borough has the most incidents?",
-            "What's the average response time?",
-            "Show monthly trends",
-            "Top emergency call types",
+            "What's the average response time by borough?",
+            "How do incidents vary by day of the week?",
+            "What are the top 5 emergency call types?",
         ]
         st.caption("Try asking:")
         s_cols = st.columns(len(suggestions))
@@ -569,25 +577,33 @@ with tab_chatbot:
             if s_cols[i].button(s, use_container_width=True):
                 st.session_state.messages.append({"role": "user", "content": s})
                 st.rerun()
+        st.write("")
 
-    st.write("")
-
+    # Render message history
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
-            st.write(msg["content"])
+            st.markdown(msg["content"])
 
+    # Clear chat button
     if st.session_state.messages:
+        st.write("")
         if st.button(":material/delete: Clear chat", type="secondary"):
             st.session_state.messages = []
             st.rerun()
 
+    # Chat input
     if prompt := st.chat_input("Ask anything about NYC EMS data…"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
-            st.write(prompt)
+            st.markdown(prompt)
+
         with st.chat_message("assistant"):
-            st.write("The EMS Assistant isn't connected yet — check back soon! 🚧")
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "The EMS Assistant isn't connected yet — check back soon! 🚧",
-        })
+            with st.spinner("Thinking…"):
+                history = st.session_state.messages[:-1]  # everything before current question
+                try:
+                    answer = ask_ems(prompt, history)
+                except Exception as exc:
+                    answer = f"Sorry, I hit an error: {exc}"
+            st.markdown(answer)
+
+        st.session_state.messages.append({"role": "assistant", "content": answer})

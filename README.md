@@ -1,6 +1,6 @@
 # NYC EMS Incident Analytics Pipeline
 
-An end-to-end data engineering and analytics project built on **556,000+ real NYC Emergency Medical Services incidents** (May – Dec 2025). Covers data ingestion, transformation, and an interactive Streamlit dashboard with a RAG-ready chatbot scaffold.
+An end-to-end data engineering and AI analytics project built on **556,000+ real NYC Emergency Medical Services incidents** (May – Dec 2025). Covers data ingestion, transformation, an interactive Streamlit dashboard, and a fully functional RAG-powered chatbot that answers natural-language questions about the data using live SQL and the Claude API.
 
 ---
 
@@ -13,6 +13,7 @@ An end-to-end data engineering and analytics project built on **556,000+ real NY
 | Storage | DuckDB (embedded, file-based) |
 | Transformation | dbt (dbt-duckdb) |
 | Dashboard | Streamlit, Altair |
+| AI / RAG | Claude API (claude-sonnet-4-6), ChromaDB |
 | Language | Python 3.12 |
 
 ---
@@ -28,6 +29,7 @@ NYC Socrata API
   → dbt intermediate          # int_enrichment: temporal features, response category, seed joins
   → dbt marts                 # 8 analytical tables
   → streamlit_app.py          # Interactive dashboard with live DuckDB queries
+  → rag.py                    # RAG module: ChromaDB + Claude tool-use for natural-language Q&A
 ```
 
 ### dbt Layers
@@ -67,7 +69,7 @@ Built with **Streamlit + Altair**. Queries `int_enrichment` directly for live, f
 
 **Color system:** Each borough has a fixed identity color across all charts. Response speed uses semantic green/orange/red. All queries are cached per filter combination (`@st.cache_data`).
 
-**Chatbot tab:** Scaffolded UI with suggestion chips and `st.chat_input` — ready to wire up an LLM for natural-language queries over the EMS data.
+**EMS Assistant (chatbot tab):** Fully functional RAG-powered chatbot. Ask questions in plain English — the assistant retrieves relevant schema context from ChromaDB, then uses Claude's tool-use API to run live SQL against DuckDB and return data-backed answers. Supports full multi-turn conversation with session history.
 
 ---
 
@@ -78,6 +80,24 @@ Built with **Streamlit + Altair**. Queries `int_enrichment` directly for live, f
 - **dbt for all transformations** — SQL is version-controlled, testable, and documented; no ad-hoc pandas transforms in the pipeline
 - **Live dashboard queries** — the dashboard bypasses pre-aggregated mart tables and queries `int_enrichment` directly so date and borough filters work without re-running dbt
 - **Configurable date range** — ingestion window is controlled by `START_DATE` / `END_DATE` env vars; no code changes needed to re-ingest a different period
+- **RAG + tool-use chatbot** — `rag.py` loads dbt YAML schema docs into ChromaDB at startup; the assistant uses vector retrieval to find relevant schema context, then calls the Claude API with a `run_query` tool that executes live DuckDB SQL to answer factual questions
+
+---
+
+## EMS Assistant (RAG Chatbot)
+
+The chatbot tab in the dashboard lets you query the data in plain English. It uses a two-stage pipeline:
+
+1. **Retrieval** — dbt model and column descriptions from all YAML files are embedded in ChromaDB. The user's question is used to retrieve the most relevant schema context.
+2. **Generation** — Claude receives the schema context and can call a `run_query` tool to execute SQL against the live DuckDB database. It then synthesises a natural-language answer from the results.
+
+Example questions it can answer:
+- *"Which borough has the slowest average response time?"*
+- *"How many incidents happened during special events in Brooklyn?"*
+- *"What's the most common emergency call type on weekends?"*
+- *"Show me month-over-month incident growth for the Bronx"*
+
+**Required:** Set `ANTHROPIC_API_KEY` in `.env` (get a key at [console.anthropic.com](https://console.anthropic.com)).
 
 ---
 
@@ -92,6 +112,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 # Add your NYC Open Data API token: APP_TOKEN=...
+# Add your Anthropic API key for the chatbot: ANTHROPIC_API_KEY=...
 ```
 
 **3. Run ingestion**

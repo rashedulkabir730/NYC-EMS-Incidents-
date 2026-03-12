@@ -15,4 +15,7 @@ altair>=5.0.0
 python-dotenv==1.0.1
 pandas==2.2.0
 pyarrow==15.0.0
-# For scheduling/orchestration (optional)
+# RAG / chatbot
+chromadb
+anthropic
+pyyaml
