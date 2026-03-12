@@ -64,7 +64,7 @@ NYC Socrata API (dataset: 76xm-jjuj)
 - All dbt models are materialized as **tables** (not views).
 - The ingestion script **appends** data; deduplication happens in the staging layer using `ROW_NUMBER() OVER (PARTITION BY cad_incident_id)`.
 - The NYC API token is loaded from `.env` as `APP_TOKEN`.
-- Data is currently filtered to **May 1 – Dec 31, 2025** (hardcoded in `pull_data.py`).
+- Data date range is controlled by `START_DATE` and `END_DATE` env vars (defaults: May 1 – Dec 31, 2025). Set these in `.env` to change the ingestion window without modifying code.
 
 ### dbt Layer Summary
 

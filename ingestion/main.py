@@ -4,6 +4,9 @@ import logging
 
 def main():
     raw_df = pull_data()
+    if raw_df.empty:
+        logging.warning("pull_data returned empty DataFrame — skipping load")
+        return
     logging.info(f'Final : {len(raw_df)}')
     load_data_duckdb(raw_df=raw_df)
 

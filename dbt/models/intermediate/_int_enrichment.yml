@@ -133,7 +133,7 @@ models:
           Human-readable outcome of the incident, resolved from incident_disposition_code
           via the Incident Dispositions seed table (e.g., "transporting patient", "patient pronounced dead").
 
-      - name: inital_call_type_desc
+      - name: initial_call_type_desc
         description: >
           Full description of the initial call type, resolved from initial_call_type
           via the Call Type Descriptions seed table (e.g., "CARDIAC ARREST", "ASTHMA ATTACK - MAJOR").

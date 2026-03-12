@@ -118,7 +118,7 @@ models:
       as incidents are reclassified after resolution.
 
     columns:
-      - name: inital_call_type_desc
+      - name: initial_call_type_desc
         description: >
           Human-readable description of the initial incident type as reported by the caller
           (e.g., "CHEST PAIN", "DIFFICULTY BREATHING"). Resolved via the Call Type Descriptions seed table.

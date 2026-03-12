@@ -1,6 +1,8 @@
 # Core data pipeline dependencies
 requests==2.31.0
 duckdb==0.10.0
+sodapy==2.1.1
+ratelimit==2.2.1
 
 # dbt for DuckDB
 dbt-duckdb==1.7.2
@@ -8,5 +10,5 @@ dbt-duckdb==1.7.2
 # Optional but recommended
 python-dotenv==1.0.1
 pandas==2.2.0
-pyarrow
+pyarrow==15.0.0
 # For scheduling/orchestration (optional)

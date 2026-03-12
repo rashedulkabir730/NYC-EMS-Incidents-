@@ -1,6 +1,4 @@
-import duckdb
-import requests
-import pandas as pd 
+import pandas as pd
 from sodapy import Socrata
 from ratelimit import limits, sleep_and_retry
 import time 
@@ -23,13 +21,13 @@ URL="data.cityofnewyork.us"
 timeout=30
 dataset_id="76xm-jjuj"
 APP_TOKEN = os.getenv("APP_TOKEN")
+START_DATE = os.getenv("START_DATE", "2025-05-01T00:00:00.000")
+END_DATE = os.getenv("END_DATE", "2025-12-31T23:59:59.999")
 
 client = Socrata(URL,app_token=APP_TOKEN,timeout=timeout)
 
 def _fetch_data_with_retry(offset, limit, where,dataset_id=dataset_id):
-    """
-    
-    """
+    """Fetch a paginated batch from the Socrata API with up to 3 retries on failure."""
     retry_count=0
     success=False
     results=None
@@ -50,21 +48,17 @@ def _fetch_data_with_retry(offset, limit, where,dataset_id=dataset_id):
     
 
 def pull_data():
-    """
-    
-    """
+    """Paginate through the full dataset and return a DataFrame of all fetched rows."""
     offset=0
     limit=50000
     rows=[]
 
     while True:
-        success,results = _fetch_data_with_retry(offset=offset, limit=limit, 
-                                                 where= "INCIDENT_DATETIME between "
-                                                    "'2025-05-01T00:00:00.000' and "
-                                                    "'2025-12-31T23:59:59.999'")
+        success,results = _fetch_data_with_retry(offset=offset, limit=limit,
+                                                 where=f"INCIDENT_DATETIME between '{START_DATE}' and '{END_DATE}'")
         if not success:
             temp_df = pd.DataFrame(rows)
-            logging.warning(f"⚠️ WARNING: Failed after 3 retries. Returning {len(rows)} partial records %s")
+            logging.warning(f"⚠️ WARNING: Failed after 3 retries. Returning {len(rows)} partial records")
             return temp_df
         if results:
             logging.info(f"Processing {len(results)}")

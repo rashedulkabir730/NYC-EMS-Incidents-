@@ -24,10 +24,10 @@ LEFT JOIN {{ ref('EMS_incident_dispatch_data_description - Incident Dispositions
 on e.incident_disposition_code=id_codes."INCIDENT DISPOSITION CODE"
 ),
 
-inital_call_type_enrichment as (
+initial_call_type_enrichment as (
 select 
 *,  
-call_type_desc."CALL TYPE DESCRIPTION" as inital_call_type_desc
+call_type_desc."CALL TYPE DESCRIPTION" as initial_call_type_desc
 from incident_code_enrichment ide 
 left join  {{ ref('EMS_incident_dispatch_data_description - Call Type Descriptions') }} as call_type_desc
 on ide.initial_call_type=call_type_desc.CALL_TYPE_CODE
@@ -35,7 +35,7 @@ on ide.initial_call_type=call_type_desc.CALL_TYPE_CODE
 
 final_call_type_enrichment as(
 select * , call_type_desc."CALL TYPE DESCRIPTION" as final_call_type_desc
-from inital_call_type_enrichment icte
+from initial_call_type_enrichment icte
 left join  {{ ref('EMS_incident_dispatch_data_description - Call Type Descriptions') }} as call_type_desc
 on icte.final_call_type=call_type_desc.CALL_TYPE_CODE
 )
