@@ -41,6 +41,12 @@ cd dbt && dbt docs generate && dbt docs serve
 pip install -r requirements.txt
 ```
 
+**Run the Streamlit dashboard:**
+```bash
+streamlit run streamlit_app.py
+# Opens at http://localhost:8501
+```
+
 ## Architecture
 
 This is a local EMS incident analytics pipeline for NYC data. There is no orchestration layer — the pipeline is run manually in two steps: ingest, then transform.
