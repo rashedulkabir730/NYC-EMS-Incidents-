@@ -1,6 +1,6 @@
 # NYC EMS Incident Analytics Pipeline
 
-An end-to-end data engineering and AI analytics project built on **556,000+ real NYC Emergency Medical Services incidents** (May – Dec 2025). Covers data ingestion, transformation, an interactive Streamlit dashboard, and a fully functional RAG-powered chatbot that answers natural-language questions about the data using live SQL and the Claude API.
+An end-to-end data engineering and AI analytics project built on **1,079,491 real NYC Emergency Medical Services incidents** (Jan – Aug 2025). Covers data ingestion, transformation, an interactive Streamlit dashboard, and a fully functional RAG-powered chatbot that answers natural-language questions about the data using live SQL and the Claude API.
 
 ---
 
@@ -9,7 +9,7 @@ An end-to-end data engineering and AI analytics project built on **556,000+ real
 | Layer | Technology |
 |---|---|
 | Data source | NYC Open Data Socrata API (`76xm-jjuj`) |
-| Ingestion | Python, sodapy, pandas |
+| Ingestion | dlt (data load tool), sodapy |
 | Storage | DuckDB (embedded, file-based) |
 | Transformation | dbt (dbt-duckdb) |
 | Dashboard | Streamlit, Altair |
@@ -22,14 +22,14 @@ An end-to-end data engineering and AI analytics project built on **556,000+ real
 
 ```
 NYC Socrata API
-  → ingestion/pull_data.py    # Paginated fetch (50k rows/request), 3-retry logic
-  → ingestion/data_sql.py     # Append-only load into DuckDB with run_id + ingestion_time
-  → data/raw.duckdb           # Local embedded database (no server required)
-  → dbt staging               # stg_incident: type casting, dedup, borough filter
-  → dbt intermediate          # int_enrichment: temporal features, response category, seed joins
-  → dbt marts                 # 8 analytical tables
-  → streamlit_app.py          # Interactive dashboard with live DuckDB queries
-  → rag.py                    # RAG module: ChromaDB + Claude tool-use for natural-language Q&A
+  → ingestion/dlt_pipeline.py   # dlt resource: paginated fetch, incremental cursor
+  → ingestion/data_sql.py       # Post-load verification (row count, date range check)
+  → data/raw.duckdb             # Local embedded database — schema: raw_dlt
+  → dbt staging                 # stg_incident: type casting, dedup, borough filter
+  → dbt intermediate            # int_enrichment: temporal features, response category, seed joins
+  → dbt marts                   # 8 analytical tables
+  → streamlit_app.py            # Interactive dashboard with live DuckDB queries
+  → rag.py                      # RAG module: ChromaDB + Claude tool-use for natural-language Q&A
 ```
 
 ### dbt Layers
@@ -75,11 +75,12 @@ Built with **Streamlit + Altair**. Queries `int_enrichment` directly for live, f
 
 ## Key Engineering Decisions
 
-- **Append-only ingestion** — raw data accumulates across runs; deduplication happens downstream in the staging layer via `ROW_NUMBER() OVER (PARTITION BY cad_incident_id)`
-- **DuckDB as the single store** — no external database server; the `.duckdb` file is the entire data warehouse
+- **dlt for ingestion** — replaces manual pandas/sodapy loading. dlt handles schema inference, state management, and incremental loading so re-runs only fetch rows newer than the last cursor position. The first run pulls all of 2025; subsequent runs are fast and cheap.
+- **Incremental cursor** — dlt tracks `incident_datetime` between runs in `.dlt/` state. Delete that folder (or run `--reset`) to trigger a full reload.
+- **Append-only write disposition** — raw data accumulates across runs; deduplication happens downstream in the staging layer via `ROW_NUMBER() OVER (PARTITION BY cad_incident_id)`
+- **DuckDB as the single store** — no external database server; the `.duckdb` file is the entire data warehouse. dlt writes to the `raw_dlt` schema; dbt transforms into the `test` schema.
 - **dbt for all transformations** — SQL is version-controlled, testable, and documented; no ad-hoc pandas transforms in the pipeline
 - **Live dashboard queries** — the dashboard bypasses pre-aggregated mart tables and queries `int_enrichment` directly so date and borough filters work without re-running dbt
-- **Configurable date range** — ingestion window is controlled by `START_DATE` / `END_DATE` env vars; no code changes needed to re-ingest a different period
 - **RAG + tool-use chatbot** — `rag.py` loads dbt YAML schema docs into ChromaDB at startup; the assistant uses vector retrieval to find relevant schema context, then calls the Claude API with a `run_query` tool that executes live DuckDB SQL to answer factual questions
 
 ---
@@ -105,6 +106,7 @@ Example questions it can answer:
 
 **1. Install dependencies**
 ```bash
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -117,7 +119,14 @@ cp .env.example .env
 
 **3. Run ingestion**
 ```bash
-python ingestion/main.py
+# First run — pulls all of 2025 (Jan–Dec, ~1M+ rows)
+python -m ingestion.main
+
+# Subsequent runs — incremental, only fetches new rows
+python -m ingestion.main
+
+# Full reload from scratch
+python -m ingestion.main --reset
 ```
 
 **4. Run dbt transformations**
@@ -137,6 +146,6 @@ streamlit run streamlit_app.py
 ## Dataset
 
 **Source:** [NYC Open Data — EMS Incident Dispatch Data](https://data.cityofnewyork.us/Public-Safety/EMS-Incident-Dispatch-Data/76xm-jjuj)
-**Period:** May 1 – Dec 31, 2025
-**Volume:** 556,490 incidents across 5 NYC boroughs
+**Period:** Jan 1 – Aug 31, 2025 (full year pulled; upstream data published through Aug)
+**Volume:** 1,079,491 incidents across 5 NYC boroughs
 **Key fields:** incident datetime, borough, dispatch/response times, call type (initial + final), incident disposition, special event indicator

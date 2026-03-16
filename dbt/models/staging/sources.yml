@@ -2,6 +2,6 @@ version: 2
 
 sources:
   - name: raw
-    schema: main
+    schema: raw_dlt
     tables:
-      - name: raw_api_data
+      - name: raw_incidents

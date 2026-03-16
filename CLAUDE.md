@@ -6,7 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Run ingestion pipeline:**
 ```bash
-python ingestion/main.py
+# Incremental run (only fetches rows newer than the last cursor)
+python -m ingestion.main
+
+# Full reload from scratch (wipes dlt state, re-fetches all of 2025)
+python -m ingestion.main --reset
 ```
 
 **Run dbt transformations:**
@@ -38,6 +42,7 @@ cd dbt && dbt docs generate && dbt docs serve
 
 **Install dependencies:**
 ```bash
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -55,22 +60,33 @@ This is a local EMS incident analytics pipeline for NYC data. There is no orches
 
 ```
 NYC Socrata API (dataset: 76xm-jjuj)
-  → ingestion/pull_data.py   # paginated fetch (50k records/request), 3-retry logic
-  → ingestion/data_sql.py    # appends to raw_api_data table in DuckDB, adds run_id + ingestion_time
-  → data/raw.duckdb          # local embedded database, no server required
-  → dbt staging              # stg_incident: type casting, dedup on cad_incident_id, filter UNKNOWN boroughs
-  → dbt intermediate         # int_enrichment: temporal features + LEFT JOINs with seed lookup tables
-  → dbt marts                # 8 analytical tables (response times, incident counts, MoM growth, etc.)
+  → ingestion/dlt_pipeline.py  # dlt resource: paginated fetch (50k rows/page), incremental cursor on incident_datetime
+  → ingestion/data_sql.py      # post-load verification: row count + date range check against raw_dlt.raw_incidents
+  → data/raw.duckdb            # local embedded database, schema: raw_dlt, table: raw_incidents
+  → dbt staging                # stg_incident: type casting, dedup on cad_incident_id, filter UNKNOWN boroughs
+  → dbt intermediate           # int_enrichment: temporal features + LEFT JOINs with seed lookup tables
+  → dbt marts                  # 8 analytical tables (response times, incident counts, MoM growth, etc.)
 ```
 
 ### Key Design Decisions
 
+- **dlt for ingestion** — dlt handles schema inference, state management, and incremental loading. On the first run it pulls all of 2025 (Jan–Dec). On re-runs it only fetches rows with `incident_datetime > last cursor value`. Cursor state is stored in `.dlt/pipelines/ems_incidents/`.
 - **DuckDB** is used as the only database — no external DB server. The file is at `data/raw.duckdb`.
+  - dlt writes to the `raw_dlt` schema (table: `raw_incidents`)
+  - dbt transforms into the `test` schema
 - **dbt profile** (`~/.dbt/profiles.yml`) points to the DuckDB file. The profile name is `ems_analytics`.
 - All dbt models are materialized as **tables** (not views).
-- The ingestion script **appends** data; deduplication happens in the staging layer using `ROW_NUMBER() OVER (PARTITION BY cad_incident_id)`.
+- The dlt resource uses `write_disposition="append"`; deduplication happens in the staging layer using `ROW_NUMBER() OVER (PARTITION BY cad_incident_id)`.
 - The NYC API token is loaded from `.env` as `APP_TOKEN`.
-- Data date range is controlled by `START_DATE` and `END_DATE` env vars (defaults: May 1 – Dec 31, 2025). Set these in `.env` to change the ingestion window without modifying code.
+- The full ingestion window is `YEAR_START` / `YEAR_END` constants in `dlt_pipeline.py` (defaults: Jan 1 – Dec 31, 2025).
+
+### Ingestion Module Summary
+
+| File | Role |
+|---|---|
+| `ingestion/dlt_pipeline.py` | dlt `@dlt.resource` generator + `run()` function. Paginates Socrata API, yields rows to dlt, manages incremental cursor. Entry point for the pipeline. |
+| `ingestion/data_sql.py` | Post-load utility. `verify_load()` queries `raw_dlt.raw_incidents` and returns row count + min/max date. Called after `dlt_run()` in `main.py`. |
+| `ingestion/main.py` | Orchestrates: calls `dlt_run(reset=...)` then `verify_load()`. Supports `--reset` flag. |
 
 ### dbt Layer Summary
 
@@ -86,6 +102,15 @@ NYC Socrata API (dataset: 76xm-jjuj)
 | Marts | `marts_special_events` | Incidents where special_event_indicator = 'Y' |
 | Marts | `marts_total_incidents_by_final_call_type` | Counts by final call type |
 | Marts | `marts_total_incidents_by_initial_call_type_desc` | Counts by initial call type description |
+
+### dbt Source
+
+The dbt staging model reads from the dlt-managed table:
+- **Source name:** `raw` (defined in `dbt/models/staging/sources.yml`)
+- **Schema:** `raw_dlt`
+- **Table:** `raw_incidents`
+
+Always update `sources.yml` if the dlt `dataset_name` or resource `name` changes in `dlt_pipeline.py`.
 
 ### Schema / Documentation YML Files
 

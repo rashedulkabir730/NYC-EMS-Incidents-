@@ -54,7 +54,7 @@ _anthropic = anthropic.Anthropic()
 SYSTEM_PROMPT = """\
 You are an expert analyst for NYC Emergency Medical Services (EMS) incident data.
 
-Dataset: 556,490 incidents across NYC's 5 boroughs (May–Dec 2025).
+Dataset: ~1,079,491 incidents across NYC's 5 boroughs (Jan–Aug 2025).
 Main table: test.int_enrichment (DuckDB — dialect is mostly standard SQL)
 
 Key columns in test.int_enrichment:

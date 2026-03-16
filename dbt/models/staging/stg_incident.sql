@@ -1,5 +1,5 @@
 WITH src AS (
-  SELECT * FROM {{ source('raw', 'raw_api_data') }}
+  SELECT * FROM {{ source('raw', 'raw_incidents') }}
 ),
 
 type_fixes AS (
